@@ -11,10 +11,15 @@ TimingTask spinningTask;
 boolean yDirection;
 // scaling is a power of 2
 int n = 4;
+float step3 = 0.5;
+float step = 1;
+float step2 = 0.1;
 
 // 2. Hints
 boolean triangleHint = true;
 boolean gridHint = true;
+boolean antialliasing = false;
+boolean b = false;
 boolean debug = true;
 
 // 3. Use FX2D, JAVA2D, P2D or P3D
@@ -22,7 +27,7 @@ String renderer = P3D;
 
 void setup() {
   //use 2^n to change the dimensions
-  size(1024, 1024, renderer);
+  size(800, 800, renderer);
   scene = new Scene(this);
   if (scene.is3D())
     scene.setType(Scene.Type.ORTHOGRAPHIC);
@@ -75,11 +80,131 @@ void triangleRaster() {
   // here we convert v1 to illustrate the idea
   if (debug) {
     pushStyle();
-    stroke(255, 255, 0, 125);
+    stroke(0, 255, 0);
     point(round(frame.coordinatesOf(v1).x()), round(frame.coordinatesOf(v1).y()));
+    stroke(0, 0, 255);
+    point(round(frame.coordinatesOf(v2).x()), round(frame.coordinatesOf(v2).y()));
+    stroke(255, 0, 0);
+    point(round(frame.coordinatesOf(v3).x()), round(frame.coordinatesOf(v3).y()));
     popStyle();
   }
+  
+  Vector pv1 = frame.coordinatesOf(v1);
+  Vector pv2 = frame.coordinatesOf(v2);
+  Vector pv3 = frame.coordinatesOf(v3);
+  
+  //if (matrixDet(pv1,pv2,pv3) <= 0){
+  //  randomizeTriangle();
+  //}else{
+  int[] dims = dimentions();
+  strokeWeight(0);
+  float[] counter = {0,0};
+  float[] colorAVG = {0,0,0}; 
+  
+  
+  for(counter[0] = dims[2]; counter[0]<= dims[0]; counter[0]+=step){
+     for(counter[1] = dims[3]; counter[1]<= dims[1]; counter[1]+=step){
+     
+     float brillo = percentage(pv1,pv2,pv3,counter);
+       if(antialliasing){    
+          if( brillo > 10 ){
+           colorAVG = baricentric(pv1,pv2,pv3,counter);
+           tint(255, 127);
+           fill(color(round(255*colorAVG[0]), round(255*colorAVG[1]), round(255*colorAVG[2])),  500 * (brillo/100)   );
+           rect(counter[0],counter[1], step, step);
+          }
+       }else{
+           if( brillo > 40){
+             colorAVG = baricentric(pv1,pv2,pv3,counter);
+             tint(255, 127);
+             fill(color(round(255*colorAVG[0]), round(255*colorAVG[1]), round(255*colorAVG[2]))   );
+             rect(counter[0],counter[1], step, step);         
+           }
+       }  
+       
+       
+       
+     if (b == true){  
+     float[] w = {0.0, 0.0, 0.0};
+       w[0] = inTriangleA(pv2,pv3,counter);
+       w[1] = inTriangleA(pv3,pv1,counter);
+       w[2] = inTriangleA(pv1,pv2,counter);
+       if(((w[0] > 0 )&& (w[1]> 0)  && (w[2] > 0))){
+           colorAVG = baricentric(pv1,pv2,pv3,counter);
+           fill(color(round(255*colorAVG[0]), round(255*colorAVG[1]), round(255*colorAVG[2])));
+           rect(counter[0],counter[1], step, step);
+       }
+      }
+     }
+    }
+   //}     
+   
 }
+
+float percentage(Vector pv1,Vector pv2,Vector pv3,float[] counter){
+  int total = 0;
+  float[] counter2 = {0,0};
+  for(counter2[0] = counter[0] ; counter2[0] < counter[0]+1; counter2[0]+=step2){
+     for(counter2[1] = counter[1] ; counter2[1] < counter[1]+1; counter2[1]+=step2){
+         stroke(255);
+         float[] w = {0.0, 0.0, 0.0};
+         w[0] = inTriangle(pv2,pv3,counter2);
+         w[1] = inTriangle(pv3,pv1,counter2);
+         w[2] = inTriangle(pv1,pv2,counter2);
+         if(((w[0] > 0 )&& (w[1]> 0)  && (w[2] > 0)) ){
+           total += 1;
+         }
+     }
+  }
+  float num = (1/step2);
+  return (total * 100) /(num * num);
+}
+
+
+int[] dimentions(){
+  
+  int[] dim ={0,0,0,0}; 
+  dim[0] = round(max(frame.coordinatesOf(v1).x(), frame.coordinatesOf(v2).x(), frame.coordinatesOf(v3).x())); //max X
+  dim[1] = round(max(frame.coordinatesOf(v1).y(), frame.coordinatesOf(v2).y(), frame.coordinatesOf(v3).y())); // max Y
+  dim[2] = round(min(frame.coordinatesOf(v1).x(), frame.coordinatesOf(v2).x(), frame.coordinatesOf(v3).x())); // min X
+  dim[3] = round(min(frame.coordinatesOf(v1).y(), frame.coordinatesOf(v2).y(), frame.coordinatesOf(v3).y())); // min Y
+  return dim;
+}
+
+
+int  matrixDet(Vector a, Vector b, Vector c){
+   return round(((b.x() - a.x())*(c.y() - a.y())) - ((b.y() - a.y())*(c.x() - a.x())));
+}
+
+float inTriangleA(Vector a, Vector b, float[] c){ 
+  return ((b.x()- a.x())*(c[1]+(step3/2) - a.y()) - (b.y()-a.y())*(c[0]+(step3/2)-a.x()));
+}
+
+float inTriangle(Vector a, Vector b, float[] c){ 
+  return ((b.x()- a.x())*(c[1] - a.y()) - (b.y()-a.y())*(c[0]-a.x()));
+}
+
+
+float distance(Vector t1, Vector t2,float[] p){
+  return ((t1.y()- t2.y())* p[0]) + ((t2.x()-t1.x())*p[1]) + (t1.x()+t2.y() - t2.x()*t1.y());
+  //return ((round(posY1) - round(posY2))*posX) + ((round(posX2) - round(posX1))*posY) + (round(posX1)* round(posY2)) - (round(posX2)*round(posY1));
+}
+
+float[] baricentric(Vector pv1, Vector pv2, Vector pv3, float[] p){
+
+  float[] results = {0.0,0.0, 0.0};
+  float[] temp1 = {pv1.x(),pv1.y()};
+  float[] temp2 = {pv2.x(),pv2.y()};
+  float[] temp3 = {pv3.x(),pv3.y()};
+  results[0] = distance(pv1, pv2, p) / distance(pv1,pv2, temp3);
+  results[1] = distance(pv2, pv3, p) / distance(pv2,pv3, temp1);
+  results[2] = distance(pv3, pv1, p) / distance(pv3,pv1, temp2);
+  return results;
+}
+
+
+
+
 
 void randomizeTriangle() {
   int low = -width/2;
@@ -87,6 +212,13 @@ void randomizeTriangle() {
   v1 = new Vector(random(low, high), random(low, high));
   v2 = new Vector(random(low, high), random(low, high));
   v3 = new Vector(random(low, high), random(low, high));
+  Vector pv1 = frame.coordinatesOf(v1);
+  Vector pv2 = frame.coordinatesOf(v2);
+  Vector pv3 = frame.coordinatesOf(v3);
+  
+  if (matrixDet(pv1,pv2,pv3) <= 0){
+    randomizeTriangle();
+  }
 }
 
 void drawTriangleHint() {
@@ -134,4 +266,14 @@ void keyPressed() {
       spinningTask.run(20);
   if (key == 'y')
     yDirection = !yDirection;
+  if (key == 'a')
+    antialliasing = !antialliasing;
+  if (key == 'b')
+    b = !b;  
+  if (key == 's'){
+    step -=  0.01;
+    if (step < 0.01){
+      step = 1;
+    }
+  }
 }
